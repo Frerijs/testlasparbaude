@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+  <meta charset="UTF-8">
+  <title>LAS + CSV (Ground punkti) + Statistika + Kļūdu klasifikācija</title>
+  <style>
+    /* =========================================
+       BĀZES (Gaišie) STILI – NEMAINĪTI
+       ========================================= */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+      margin: 20px;
+      background-color: #f8f9fa;
+    }
+    h1 {
+      color: #262730;
+      font-size: 2em;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    h3, h4 {
+      color: #262730;
+    }
+    p, li {
+      color: #262730;
+      font-size: 1em;
+    }
+    #results table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 1rem;
+      background-color: white;
+    }
+    #results th, #results td {
+      border: 1px solid #ccc;
+      padding: 8px 12px;
+      text-align: left;
+    }
+    #error {
+      color: red;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+    #status {
+      margin-top: 10px;
+      color: #333;
+    }
+    button {
+      background-color: #0099ff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+      margin: 4px 2px;
+      cursor: pointer;
+      border-radius: 5px;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #007acc;
+    }
+    input[type="file"], input[type="number"] {
+      padding: 8px;
+      margin-bottom: 10px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 14px;
+    }
+    .legend {
+      padding: 8px;
+      background-color: white;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-top: 20px;
+      line-height: 18px;
+      color: #555;
+    }
+    .legend i {
+      width: 18px;
+      height: 18px;
+      float: left;
+      margin-right: 8px;
+      opacity: 0.7;
+    }
+    .button-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .download-link {
+      text-decoration: none;
+      background-color: #28a745;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 5px;
+      font-size: 16px;
+      display: none;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    .download-link:hover {
+      background-color: #218838;
+    }
+    #map {
+      height: 800px; 
+      margin-top: 20px;
+      display: none;
+    }
+    /* Pielāgo Layers Control, lai vienmēr būtu izvērsta */
+    .leaflet-control-layers-expanded {
+      max-height: none;
+      overflow: visible;
+    }
+    /* Stils ΔZ etiķetēm */
+    .dz-label {
+      font-weight: bold;
+      background: rgba(255, 255, 255, 0.7);
+      padding: 2px 4px;
+      border-radius: 3px;
+    }
+
+    /* =========================================
+       TUMŠAIS REŽĪMS
+       ========================================= */
+    /* Kad <body> ir klase "dark-mode", mainām tikai to, kas nepieciešams tumšajam fonam un krāsai */
+    body.dark-mode {
+      background-color: #121212; /* Tumšs fons */
+      color: #ffffff;           /* Gaišs teksts */
+    }
+
+    /* Virsraksti un teksti tumšajā režīmā */
+    body.dark-mode h1,
+    body.dark-mode h3,
+    body.dark-mode h4,
+    body.dark-mode p,
+    body.dark-mode li {
+      color: #fff;
+    }
+
+    /* Tabula tumšajā režīmā */
+    body.dark-mode #results table {
+      background-color: #1e1e1e;
+      border-color: #444;
+    }
+    body.dark-mode #results th,
+    body.dark-mode #results td {
+      border-color: #444;
+      color: #ccc;
+    }
+
+    /* .legend tumšajā režīmā */
+    body.dark-mode .legend {
+      background-color: #1e1e1e;
+      border-color: #444;
+      color: #ccc;
+    }
+
+    /* Leaflet interfeisa tumšā krāsa: slāņu kontroles panelis, pop-up, utt. */
+    body.dark-mode .leaflet-control-layers-expanded {
+      background: #2b2b2b;
+      color: #ccc;
+    }
+    body.dark-mode .leaflet-popup-content-wrapper {
+      background: #2b2b2b;
+      color: #ccc;
+    }
+    body.dark-mode .leaflet-popup-tip-container {
+      opacity: 0.7;
+    }
+
+    /* Tumšais slēdzis – novietojam augšējā labajā stūrī */
+    .dark-mode-switch-container {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 5px 10px;
+      border-radius: 20px;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    /* Kad jau ir tumšais režīms, kontaineri padarām tumšāku, lai neizceltos */
+    body.dark-mode .dark-mode-switch-container {
+      background: rgba(0, 0, 0, 0.5);
+    }
+
+    /* Pašam slēdzim (checkbox) stilu var pielabot pēc vajadzības */
+    #darkModeSwitch {
+      transform: scale(1.3);
+      cursor: pointer;
+    }
+    .dark-mode-switch-label {
+      font-weight: 500;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    /* Papildus stils tumšajam režīmam ievades laukiem – tumšs fons, balts teksts */
+    body.dark-mode input[type="file"],
+    body.dark-mode input[type="number"] {
+      background-color: #2b2b2b;
+      color: #ffffff;
+      border: 1px solid #444;
+    }
+
+    /* Nodrošina, ka #status elements ir baltā krāsā arī tumšajā režīmā */
+    body.dark-mode #status {
+      color: #ffffff;
+    }
+
+    /* Koordinātu sistēmas izvēlei */
+    .coord-selection {
+      margin-top: 10px;
+      margin-bottom: 10px;
+    }
+    .coord-selection label {
+      margin-right: 15px;
+      cursor: pointer;
+    }
+  </style>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+</head>
+<body>
+  <!-- Tumšā režīma slēdzis (augšējā labajā stūrī) -->
+  <div class="dark-mode-switch-container">
+    <label for="darkModeSwitch" class="dark-mode-switch-label">Tumšais režīms</label>
+    <input type="checkbox" id="darkModeSwitch" />
+  </div>
+
+  <h1>LAS-CSV Salīdzināšana</h1>
+
+  <p><strong>LAS fails:</strong></p>
+  <input type="file" id="lasFile" accept=".las,.laz" />
+
+  <p><strong>CSV fails (x,y,z):</strong></p>
+  <input type="file" id="csvFile" accept=".csv,text/csv" />
+
+  <p><strong>Meklēšanas attālums (m):</strong></p>
+  <input type="number" id="maxDistInput" value="0.2" step="0.01" />
+
+  <!-- Koordinātu sistēmas izvēle -->
+  <div class="coord-selection">
+    <p><strong>Koordinātu sistēma:</strong></p>
+    <label><input type="radio" name="coordSystem" value="LV95" checked> Latvija (EPSG:3059)</label>
+    <label><input type="radio" name="coordSystem" value="LKS94"> Lietuva (LKS94/EPSG:3346)</label>
+  </div>
+
+  <br/><br/>
+  
+  <div class="button-container">
+    <button id="processBtn">Sākt apstrādi</button>
+    <a id="downloadLink" class="download-link" href="#" download="rezultati.csv">Lejupielādēt CSV</a>
+    <a id="downloadDXFLink" class="download-link" href="#" download="rezultati.dxf">Lejupielādēt DXF</a>
+  </div>
+
+  <div id="error"></div>
+  <div id="status"></div>
+  
+  <div id="map"></div>
+  
+  <div id="results"></div>
+
+  <!-- Skripti -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <script>
+    var lasInput = document.getElementById("lasFile");
+    var csvInput = document.getElementById("csvFile");
+    var maxDistInput = document.getElementById("maxDistInput");
+    var processBtn = document.getElementById("processBtn");
+    var downloadLink = document.getElementById("downloadLink");
+    var downloadDXFLink = document.getElementById("downloadDXFLink");
+
+    var errorDiv = document.getElementById("error");
+    var statusDiv = document.getElementById("status");
+    var resultsDiv = document.getElementById("results");
+    var mapDiv = document.getElementById("map");
+
+    // Koordinātu sistēmas izvēle
+    var coordSystemRadios = document.getElementsByName("coordSystem");
+    var selectedCoordSystem = "LV95"; // Noklusējums Latvijas koordinātu sistēma
+
+    // Klausās uz koordinātu sistēmas maiņu
+    for (var i = 0; i < coordSystemRadios.length; i++) {
+      coordSystemRadios[i].addEventListener('change', function() {
+        selectedCoordSystem = this.value;
+      });
+    }
+
+    var csvPoints = [];
+    var bestDist = [];
+    var bestLASX = [];
+    var bestLASY = [];
+    var bestLASZ = [];
+
+    var chunkTasks = [];
+    var totalChunks = 0;
+    var chunksCompleted = 0;
+    var workers = [];
+    var freeWorkers = [];
+    var CHUNK_SIZE = 100000;
+    var numWorkers = navigator.hardwareConcurrency || 4;
+
+    var lasFile;
+    var lasInfo;
+
+    // Karte (globālā mainīgā), lai vēlāk var noņemt slāņus utt.
+    var myMap = null;
+    // Gaišais un tumšais tile slānis
+    var lightTileLayer = null;
+    var darkTileLayer = null;
+
+    // Palīgmē funkcija, lai droši formatētu skaitļus
+    function formatNumber(value) {
+      return typeof value === 'number' ? value.toFixed(3) : "";
+    }
+
+    // ------------------------- Tumšā režīma pārslēgšana -------------------------
+    const darkModeCheckbox = document.getElementById('darkModeSwitch');
+    darkModeCheckbox.addEventListener('change', function() {
+      document.body.classList.toggle('dark-mode', this.checked);
+
+      // Ja karte jau ir izveidota, nomainām slāni
+      if (myMap) {
+        if (this.checked) {
+          // Pārslēgties uz tumšo slāni
+          if (myMap.hasLayer(lightTileLayer)) {
+            myMap.removeLayer(lightTileLayer);
+          }
+          if (darkTileLayer) {
+            darkTileLayer.addTo(myMap);
+          }
+        } else {
+          // Pārslēgties uz gaišo slāni
+          if (myMap.hasLayer(darkTileLayer)) {
+            myMap.removeLayer(darkTileLayer);
+          }
+          if (lightTileLayer) {
+            lightTileLayer.addTo(myMap);
+          }
+        }
+      }
+    });
+
+    function parseCSV(file) {
+      return new Promise(function(resolve, reject) {
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: true,
+          complete: function(results) {
+            try {
+              var data = results.data;
+              var pts = data.map(function(row) {
+                var keys = {};
+                Object.keys(row).forEach(function(k) {
+                  keys[k.toLowerCase()] = row[k];
+                });
+                var X = parseFloat(keys['x']);
+                var Y = parseFloat(keys['y']);
+                var Z = parseFloat(keys['z']);
+                return {x:X, y:Y, z:Z};
+              }).filter(function(p) {
+                return !isNaN(p.x) && !isNaN(p.y) && !isNaN(p.z);
+              });
+              resolve(pts);
+            } catch (err) {
+              reject(err);
+            }
+          },
+          error: function(err) {
+            reject(err);
+          }
+        });
+      });
+    }
+
+    async function readLASHeader(file) {
+      var headerSize = 375;
+      var ab = await file.slice(0, headerSize).arrayBuffer();
+      var dv = new DataView(ab);
+
+      var sig = String.fromCharCode(
+        dv.getUint8(0), dv.getUint8(1),
+        dv.getUint8(2), dv.getUint8(3)
+      );
+      if (sig !== "LASF") {
+        throw new Error("Failam nav 'LASF' signatūra!");
+      }
+
+      var pointDataOffset = dv.getUint32(96, true);
+      var numPoints = dv.getUint32(107, true);
+
+      var sX = dv.getFloat64(131, true);
+      var sY = dv.getFloat64(139, true);
+      var sZ = dv.getFloat64(147, true);
+      var oX = dv.getFloat64(155, true);
+      var oY = dv.getFloat64(163, true);
+      var oZ = dv.getFloat64(171, true);
+
+      var fmt = dv.getUint8(104);
+      if ([0,1,2,3].indexOf(fmt) === -1){
+        throw new Error("Neparedzēts pointDataFormat=" + fmt);
+      }
+      var recLen = dv.getUint16(105, true);
+
+      return {
+        numPoints: numPoints,
+        pointDataOffset: pointDataOffset,
+        pointRecordLen: recLen,
+        scale: [sX, sY, sZ],
+        offset: [oX, oY, oZ]
+      };
+    }
+
+    function createWorkerPool(num) {
+      workers = [];
+      freeWorkers = [];
+      for (var i = 0; i < num; i++) {
+        var workerCode = [
+          "var csvPoints = [];",
+          "var maxDistance = 0.2;",
+          "onmessage = function(evt) {",
+          "  var msg = evt.data;",
+          "  if (msg.type === 'initCSV') {",
+          "    csvPoints = msg.csvPoints;",
+          "    maxDistance = msg.maxDistance || 0.2;",
+          "  } else if (msg.type === 'processChunk') {",
+          "    var buffer = msg.buffer;",
+          "    var chunkPoints = msg.chunkPoints;",
+          "    var pointRecordLen = msg.pointRecordLen;",
+          "    var scale = msg.scale;",
+          "    var offset = msg.offset;",
+          "    var dv = new DataView(buffer);",
+          "    var off = 0;",
+          "    var updates = [];",
+          "    for (var i2 = 0; i2 < chunkPoints; i2++) {",
+          "      var Xint = dv.getInt32(off, true);",
+          "      var Yint = dv.getInt32(off + 4, true);",
+          "      var Zint = dv.getInt32(off + 8, true);",
+          "      var classification = dv.getUint8(off + 15);",
+          "      off += pointRecordLen;",
+          "      if (classification === 2) {",
+          "        var X = Xint * scale[0] + offset[0];",
+          "        var Y = Yint * scale[1] + offset[1];",
+          "        var Z = Zint * scale[2] + offset[2];",
+          "        for (var c = 0; c < csvPoints.length; c++) {",
+          "          var dx = csvPoints[c].x - X;",
+          "          var dy = csvPoints[c].y - Y;",
+          "          var dist2 = dx * dx + dy * dy;",
+          "          if (dist2 <= maxDistance * maxDistance) {",
+          "            updates.push({",
+          "              idx: c,",
+          "              dist: Math.sqrt(dist2),",
+          "              lasX: X,",
+          "              lasY: Y,",
+          "              lasZ: Z",
+          "            });",
+          "          }",
+          "        }",
+          "      }",
+          "    }",
+          "    postMessage({ type: 'chunkResult', payload: updates });",
+          "  } else if (msg.type === 'noMoreChunks') {",
+          "    postMessage({ type: 'done' });",
+          "  }",
+          "};"
+        ].join("\n");
+        var blob = new Blob([workerCode], { type: "application/javascript" });
+        var url = URL.createObjectURL(blob);
+        var w = new Worker(url);
+
+        w.onmessage = function(evt) {
+          handleWorkerMessage(this, evt.data);
+        };
+        workers.push(w);
+        freeWorkers.push(w);
+      }
+    }
+
+    function handleWorkerMessage(worker, msg){
+      if (msg.type === 'chunkResult'){
+        var payload = msg.payload;
+        for (var i = 0; i < payload.length; i++){
+          var upd = payload[i];
+          if (upd.dist < bestDist[upd.idx]){
+            bestDist[upd.idx] = upd.dist;
+            bestLASX[upd.idx] = upd.lasX;
+            bestLASY[upd.idx] = upd.lasY;
+            bestLASZ[upd.idx] = upd.lasZ;
+          }
+        }
+        chunksCompleted++;
+        statusDiv.textContent = "Chunki pabeigti: " + chunksCompleted + " / " + totalChunks;
+        freeWorkers.push(worker);
+        scheduleChunk();
+      }
+      else if (msg.type === 'done'){
+        // Worker pabeidz, bet mums šeit nav īpašas darbības
+      }
+    }
+
+    async function scheduleChunk(){
+      if (chunkTasks.length === 0){
+        if (chunksCompleted === totalChunks){
+          finalizeResults();
+        }
+        return;
+      }
+      if (freeWorkers.length === 0) return;
+
+      var task = chunkTasks.shift();
+      var worker = freeWorkers.pop();
+
+      var blob = lasFile.slice(task.byteStart, task.byteStart + task.byteLength);
+      var ab = await blob.arrayBuffer();
+
+      worker.postMessage({
+        type: 'processChunk',
+        buffer: ab,
+        chunkPoints: task.chunkPoints,
+        pointRecordLen: lasInfo.pointRecordLen,
+        scale: lasInfo.scale,
+        offset: lasInfo.offset
+      }, [ab]);
+    }
+
+    function generateDXF(matchedLines, unmatchedLines) {
+      var dxf = '';
+      // Start TABLES section
+      dxf += '0\nSECTION\n';
+      dxf += '2\nTABLES\n';
+      dxf += '0\nTABLE\n';
+      dxf += '2\nLAYER\n';
+      dxf += '70\n1\n'; // Flags
+      // Define LAS_Punkti layer
+      dxf += '0\nLAYER\n';
+      dxf += '2\nLAS_Punkti\n';
+      dxf += '70\n0\n';
+      dxf += '62\n7\n'; // Color number: white
+      dxf += '6\nCONTINUOUS\n';
+      // Define CSV_Punkti_Matched layer
+      dxf += '0\nLAYER\n';
+      dxf += '2\nCSV_Punkti_Matched\n';
+      dxf += '70\n0\n';
+      dxf += '62\n8\n'; // Color number: gray
+      dxf += '6\nCONTINUOUS\n';
+      // Define CSV_Punkti_Unmatched layer
+      dxf += '0\nLAYER\n';
+      dxf += '2\nCSV_Punkti_Unmatched\n';
+      dxf += '70\n0\n';
+      dxf += '62\n7\n'; // Color number: white
+      dxf += '6\nCONTINUOUS\n';
+      // Define Starpibas layers
+      dxf += '0\nLAYER\n';
+      dxf += '2\nStarpibas\n';
+      dxf += '70\n0\n';
+      dxf += '62\n7\n'; 
+      dxf += '6\nCONTINUOUS\n';
+      dxf += '0\nLAYER\n';
+      dxf += '2\nPlus_vertibas\n';
+      dxf += '70\n0\n';
+      dxf += '62\n3\n'; // Zaļa
+      dxf += '6\nCONTINUOUS\n';
+      dxf += '0\nLAYER\n';
+      dxf += '2\nMinus_vertibas\n';
+      dxf += '70\n0\n';
+      dxf += '62\n4\n'; // Sarkana
+      dxf += '6\nCONTINUOUS\n';
+      dxf += '0\nENDTAB\n';
+      dxf += '0\nENDSEC\n';
+
+      // Start ENTITIES section
+      dxf += '0\nSECTION\n';
+      dxf += '2\nENTITIES\n';
+      // Add LAS punkti
+      for (var i = 0; i < matchedLines.length; i++) {
+        var point = matchedLines[i];
+        // LAS Punkti
+        dxf += '0\nPOINT\n';
+        dxf += '8\nLAS_Punkti\n'; 
+        dxf += '10\n' + (point.lasX !== null && point.lasX !== undefined ? point.lasX : '') + '\n';
+        dxf += '20\n' + (point.lasY !== null && point.lasY !== undefined ? point.lasY : '') + '\n';
+        dxf += '30\n' + (point.lasZ !== null && point.lasZ !== undefined ? point.lasZ : '') + '\n';
+        // CSV Punkti (Matched)
+        dxf += '0\nPOINT\n';
+        dxf += '8\nCSV_Punkti_Matched\n'; 
+        dxf += '10\n' + (point.csvX !== null && point.csvX !== undefined ? point.csvX : '') + '\n';
+        dxf += '20\n' + (point.csvY !== null && point.csvY !== undefined ? point.csvY : '') + '\n';
+        dxf += '30\n' + (point.csvZ !== null && point.csvZ !== undefined ? point.csvZ : '') + '\n';
+        // Starpības Punkti ar Tekstu
+        dxf += '0\nPOINT\n';
+        var dz = point.dz;
+        var dzAbs = Math.abs(dz);
+        var colorCode = 7; // Default white
+        var layerName = "Starpibas";
+
+        if (dz > 0) { // Plus vērtības
+          if (dzAbs > 1.0) {
+            colorCode = 1; // #FF0000 - Red
+            layerName = "Plus_vertibas";
+          } else if (dzAbs > 0.5) {
+            colorCode = 3; 
+            layerName = "Plus_vertibas";
+          } else if (dzAbs > 0.2) {
+            colorCode = 4;
+            layerName = "Plus_vertibas";
+          } else if (dzAbs > 0.1) {
+            colorCode = 5;
+            layerName = "Plus_vertibas";
+          } else {
+            colorCode = 3; 
+            layerName = "Plus_vertibas";
+          }
+        } else { // Mīnus vērtības
+          if (dzAbs > 1.0) {
+            colorCode = 5; 
+            layerName = "Minus_vertibas";
+          } else if (dzAbs > 0.5) {
+            colorCode = 4; 
+            layerName = "Minus_vertibas";
+          } else if (dzAbs > 0.2) {
+            colorCode = 5; 
+            layerName = "Minus_vertibas";
+          } else if (dzAbs > 0.1) {
+            colorCode = 4; 
+            layerName = "Minus_vertibas";
+          } else {
+            colorCode = 3;
+            layerName = "Minus_vertibas";
+          }
+        }
+
+        dxf += '8\n' + layerName + '\n'; 
+        dxf += '62\n' + colorCode + '\n'; 
+        dxf += '10\n' + (point.csvX !== null && point.csvX !== undefined ? point.csvX : '') + '\n'; 
+        dxf += '20\n' + (point.csvY !== null && point.csvY !== undefined ? point.csvY : '') + '\n'; 
+        dxf += '30\n' + (point.csvZ !== null && point.csvZ !== undefined ? point.csvZ : '') + '\n'; 
+
+        // Teksta entitāte ΔZ
+        dxf += '0\nTEXT\n';
+        dxf += '8\n' + layerName + '\n';
+        dxf += '62\n' + colorCode + '\n';
+        dxf += '10\n' + (point.csvX !== null && point.csvX !== undefined ? point.csvX : '') + '\n';
+        dxf += '20\n' + (point.csvY !== null && point.csvY !== undefined ? point.csvY : '') + '\n';
+        dxf += '30\n' + (point.csvZ !== null && point.csvZ !== undefined ? point.csvZ : '') + '\n';
+        dxf += '40\n1.0\n'; 
+        dxf += '1\n' + (dz !== null && dz !== undefined ? dz.toFixed(3) : '') + ' m\n';
+      }
+
+      // Add unmatched lines
+      for (var i = 0; i < unmatchedLines.length; i++){
+        var point = unmatchedLines[i];
+        dxf += '0\nPOINT\n';
+        dxf += '8\nCSV_Punkti_Unmatched\n'; 
+        dxf += '10\n' + (point.csvX !== null && point.csvX !== undefined ? point.csvX : '') + '\n';
+        dxf += '20\n' + (point.csvY !== null && point.csvY !== undefined ? point.csvY : '') + '\n';
+        dxf += '30\n' + (point.csvZ !== null && point.csvZ !== undefined ? point.csvZ : '') + '\n';
+      }
+
+      dxf += '0\nENDSEC\n';
+      dxf += '0\nEOF\n';
+      return dxf;
+    }
+
+    function finalizeResults(){
+      var matchedLines = [];
+      var unmatchedLines = [];
+      var statsDZPlus = [];
+      var statsDZMinus = [];
+      var statsDZTotal = [];
+      for (var i = 0; i < csvPoints.length; i++){
+        if (bestDist[i] < Infinity){
+          var dz = csvPoints[i].z - bestLASZ[i];
+          if(dz >=0){
+            statsDZPlus.push(dz);
+          } else {
+            statsDZMinus.push(dz);
+          }
+          statsDZTotal.push(dz);
+          matchedLines.push({
+            csvX: csvPoints[i].x,
+            csvY: csvPoints[i].y,
+            csvZ: csvPoints[i].z,
+            lasX: bestLASX[i],
+            lasY: bestLASY[i],
+            lasZ: bestLASZ[i],
+            dist: bestDist[i],
+            dz: dz
+          });
+        } else {
+          unmatchedLines.push({
+            csvX: csvPoints[i].x,
+            csvY: csvPoints[i].y,
+            csvZ: csvPoints[i].z,
+            lasX: null,
+            lasY: null,
+            lasZ: null,
+            dist: null,
+            dz: null
+          });
+        }
+      }
+
+      // Tabula
+      var htmlTable = "<table>" +
+        "<tr>" +
+        "<th>CSV X</th><th>CSV Y</th><th>CSV Z</th>" +
+        "<th>LAS X</th><th>LAS Y</th><th>LAS Z</th>" +
+        "<th>Dist (m)</th><th>&Delta;Z (m)</th>" +
+        "<th>Status</th>" +
+        "</tr>";
+      var csvLines = ["CSV_X,CSV_Y,CSV_Z,LAS_X,LAS_Y,LAS_Z,Dist,DeltaZ,Status"];
+
+      // Add matched lines
+      for (i = 0; i < matchedLines.length; i++){
+        var row = matchedLines[i];
+        htmlTable += "<tr>" +
+          "<td>" + formatNumber(row.csvX) + "</td>" +
+          "<td>" + formatNumber(row.csvY) + "</td>" +
+          "<td>" + formatNumber(row.csvZ) + "</td>" +
+          "<td>" + formatNumber(row.lasX) + "</td>" +
+          "<td>" + formatNumber(row.lasY) + "</td>" +
+          "<td>" + formatNumber(row.lasZ) + "</td>" +
+          "<td>" + formatNumber(row.dist) + "</td>" +
+          "<td>" + formatNumber(row.dz) + "</td>" +
+          "<td>Matched</td>" +
+        "</tr>";
+        csvLines.push([
+          formatNumber(row.csvX),
+          formatNumber(row.csvY),
+          formatNumber(row.csvZ),
+          formatNumber(row.lasX),
+          formatNumber(row.lasY),
+          formatNumber(row.lasZ),
+          formatNumber(row.dist),
+          formatNumber(row.dz),
+          "Matched"
+        ].join(","));
+      }
+
+      // Add unmatched lines
+      for (i = 0; i < unmatchedLines.length; i++){
+        var row = unmatchedLines[i];
+        htmlTable += "<tr>" +
+          "<td>" + formatNumber(row.csvX) + "</td>" +
+          "<td>" + formatNumber(row.csvY) + "</td>" +
+          "<td>" + formatNumber(row.csvZ) + "</td>" +
+          "<td></td><td></td><td></td>" +
+          "<td></td><td></td>" +
+          "<td>Unmatched</td>" +
+        "</tr>";
+        csvLines.push([
+          formatNumber(row.csvX),
+          formatNumber(row.csvY),
+          formatNumber(row.csvZ),
+          "", "", "",
+          "", "",
+          "Unmatched"
+        ].join(","));
+      }
+
+      htmlTable += "</table>";
+
+      // Statistika
+      var statsHTML = "";
+      if (statsDZPlus.length > 0 || statsDZMinus.length > 0){
+        var statsPlus = calculateStats(statsDZPlus);
+        var statsMinus = calculateStats(statsDZMinus);
+        var statsTotal = calculateStats(statsDZTotal);
+
+        statsHTML = "<p><strong>Statistika</strong>:</p><ul>";
+
+        if (statsDZPlus.length > 0){
+          statsHTML += "<li><strong>Plus vērtības:</strong>" +
+            "<ul>" +
+              "<li>Salīdzināto punktu skaits: " + statsDZPlus.length + "</li>" +
+              "<li>Minimālā starpība (&Delta;Z): " + formatNumber(statsPlus.min) + "</li>" +
+              "<li>Maksimālā starpība (&Delta;Z): " + formatNumber(statsPlus.max) + "</li>" +
+              "<li>Vidējā starpība (&Delta;Z): " + formatNumber(statsPlus.mean) + "</li>" +
+              "<li>Kvadrātiskā vidējā kļūda (RMSE): " + formatNumber(statsPlus.rmse) + "</li>" +
+            "</ul></li>";
+        }
+
+        if (statsDZMinus.length > 0){
+          statsHTML += "<li><strong>Mīnus vērtības:</strong>" +
+            "<ul>" +
+              "<li>Salīdzināto punktu skaits: " + statsDZMinus.length + "</li>" +
+              "<li>Minimālā starpība (&Delta;Z): " + formatNumber(statsMinus.min) + "</li>" +
+              "<li>Maksimālā starpība (&Delta;Z): " + formatNumber(statsMinus.max) + "</li>" +
+              "<li>Vidējā starpība (&Delta;Z): " + formatNumber(statsMinus.mean) + "</li>" +
+              "<li>Kvadrātiskā vidējā kļūda (RMSE): " + formatNumber(statsMinus.rmse) + "</li>" +
+            "</ul></li>";
+        }
+
+        // Kopā
+        if (statsDZTotal.length > 0){
+          statsHTML += "<li><strong>Kopā:</strong>" +
+            "<ul>" +
+              "<li>Salīdzināto punktu skaits: " + statsDZTotal.length + "</li>" +
+              "<li>Minimālā starpība (&Delta;Z): " + formatNumber(statsTotal.min) + "</li>" +
+              "<li>Maksimālā starpība (&Delta;Z): " + formatNumber(statsTotal.max) + "</li>" +
+              "<li>Vidējā starpība (&Delta;Z): " + formatNumber(statsTotal.mean) + "</li>" +
+              "<li>Kvadrātiskā vidējā kļūda (RMSE): " + formatNumber(statsTotal.rmse) + "</li>" +
+            "</ul></li>";
+        }
+
+        statsHTML += "</ul>";
+      } else {
+        statsHTML = "<p><strong>Statistika</strong>: Nevienam CSV punktam nav tuvā ground LAS punktam!</p>";
+      }
+
+      // Kļūdu klasifikācija
+      var rangeCountsPlus = {
+        "virs 1.0 m": 0,
+        "0.5–1.0 m": 0,
+        "0.2–0.5 m": 0,
+        "0.1–0.2 m": 0,
+        "līdz 0.1 m": 0
+      };
+      var rangeCountsMinus = {
+        "līdz 0.1 m": 0,
+        "0.1–0.2 m": 0,
+        "0.2–0.5 m": 0,
+        "0.5–1.0 m": 0,
+        "virs 1.0 m": 0
+      };
+
+      for (i = 0; i < matchedLines.length; i++){
+        var dz = matchedLines[i].dz;
+        var dzAbs = Math.abs(dz);
+        if(dz >=0){
+          if (dzAbs > 1.0) {
+            rangeCountsPlus["virs 1.0 m"]++;
+          } else if (dzAbs > 0.5) {
+            rangeCountsPlus["0.5–1.0 m"]++;
+          } else if (dzAbs > 0.2) {
+            rangeCountsPlus["0.2–0.5 m"]++;
+          } else if (dzAbs > 0.1) {
+            rangeCountsPlus["0.1–0.2 m"]++;
+          } else {
+            rangeCountsPlus["līdz 0.1 m"]++;
+          }
+        } else {
+          if (dzAbs > 1.0) {
+            rangeCountsMinus["virs 1.0 m"]++;
+          } else if (dzAbs > 0.5) {
+            rangeCountsMinus["0.5–1.0 m"]++;
+          } else if (dzAbs > 0.2) {
+            rangeCountsMinus["0.2–0.5 m"]++;
+          } else if (dzAbs > 0.1) {
+            rangeCountsMinus["0.1–0.2 m"]++;
+          } else {
+            rangeCountsMinus["līdz 0.1 m"]++;
+          }
+        }
+      }
+
+      var classificationHTML = "" +
+    "<h4>Kļūdu klasifikācija:</h4>" +
+    "<h5>Plus vērtības (ΔZ ≥ 0):</h5>" +
+    "<table>" +
+    "<tr><th>Intervāls</th><th>Krāsa</th><th>Punktu skaits</th></tr>" +
+    "<tr><td>virs 1.0 m</td><td style='background: #FF0000; color: #FFFFFF;'></td><td>" + rangeCountsPlus["virs 1.0 m"] + "</td></tr>" +
+    "<tr><td>0.5–1.0 m</td><td style='background: #C80032; color: #FFFFFF;'></td><td>" + rangeCountsPlus["0.5–1.0 m"] + "</td></tr>" +
+    "<tr><td>0.2–0.5 m</td><td style='background: #E57373; color: #000000;'</td><td>" + rangeCountsPlus["0.2–0.5 m"] + "</td></tr>" +
+    "<tr><td>0.1–0.2 m</td><td style='background: #FFCDD2; color: #000000;'></td><td>" + rangeCountsPlus["0.1–0.2 m"] + "</td></tr>" +
+    "<tr><td>līdz 0.1 m</td><td style='background: #8BC34A; color: #000000;'></td><td>" + rangeCountsPlus["līdz 0.1 m"] + "</td></tr>" +
+    "</table>" +
+    "<h5>Mīnus vērtības (ΔZ < 0):</h5>" +
+    "<table>" +
+    "<tr><th>Intervāls</th><th>Krāsa</th><th>Punktu skaits</th></tr>" +
+    "<tr><td>līdz 0.1 m</td><td style='background: #8BC34A; color: #000000;'></td><td>" + rangeCountsMinus["līdz 0.1 m"] + "</td></tr>" +
+    "<tr><td>0.1–0.2 m</td><td style='background: #B3E5FC; color: #000000;'></td><td>" + rangeCountsMinus["0.1–0.2 m"] + "</td></tr>" +
+    "<tr><td>0.2–0.5 m</td><td style='background: #64B5F6; color: #000000;'></td><td>" + rangeCountsMinus["0.2–0.5 m"] + "</td></tr>" +
+    "<tr><td>0.5–1.0 m</td><td style='background: #1976D2; color: #FFFFFF;'></td><td>" + rangeCountsMinus["0.5–1.0 m"] + "</td></tr>" +
+    "<tr><td>virs 1.0 m</td><td style='background: #0000FF; color: #FFFFFF;'></td><td>" + rangeCountsMinus["virs 1.0 m"] + "</td></tr>" +
+    "</table>";
+
+      resultsDiv.innerHTML = "" +
+        statsHTML +
+        classificationHTML +
+        htmlTable;
+
+      // CSV Lejupielāde
+      var csvText = csvLines.join("\n");
+      var csvBlob = new Blob([csvText], {type:"text/csv"});
+      var csvUrl = URL.createObjectURL(csvBlob);
+
+      downloadLink.href = csvUrl;
+      downloadLink.style.display = "inline-block";
+
+      // DXF Lejupielāde
+      if (matchedLines.length > 0 || unmatchedLines.length > 0) {
+        // Definē koordinātu sistēmas
+        proj4.defs("EPSG:3059","+proj=tmerc +lat_0=0 +lon_0=24 +k=0.9996 +x_0=500000 +y_0=-6000000 +ellps=GRS80 +units=m +no_defs");
+        proj4.defs("EPSG:3346","+proj=tmerc +lat_0=0 +lon_0=24 +k=0.9998 +x_0=500000 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
+
+        // Izvēlētā koordinātu sistēma
+        var sourceSystem = (selectedCoordSystem === "LV95") ? "EPSG:3059" : "EPSG:3346";
+
+        var transformedMatchedPoints = [];
+        var transformedLASPoints = [];
+        for (i = 0; i < matchedLines.length; i++){
+          var p = matchedLines[i];
+          var outCSV = proj4(sourceSystem, "EPSG:4326", [p.csvX, p.csvY]);
+          transformedMatchedPoints.push({
+            lat: outCSV[1],
+            lon: outCSV[0],
+            dz: p.dz
+          });
+          var outLAS = proj4(sourceSystem, "EPSG:4326", [p.lasX, p.lasY]);
+          transformedLASPoints.push({
+            lat: outLAS[1],
+            lon: outLAS[0],
+            dz: p.dz
+          });
+        }
+
+        var transformedUnmatchedPoints = [];
+        for (i = 0; i < unmatchedLines.length; i++){
+          var p = unmatchedLines[i];
+          var out = proj4(sourceSystem, "EPSG:4326", [p.csvX, p.csvY]);
+          transformedUnmatchedPoints.push({
+            lat: out[1],
+            lon: out[0]
+          });
+        }
+
+        var dxfContent = generateDXF(matchedLines, unmatchedLines);
+        var dxfBlob = new Blob([dxfContent], { type: 'application/dxf' });
+        var dxfUrl = URL.createObjectURL(dxfBlob);
+        downloadDXFLink.href = dxfUrl;
+        downloadDXFLink.style.display = "inline-block";
+
+        // Karte
+        if (transformedMatchedPoints.length === 0 && transformedUnmatchedPoints.length === 0) {
+          mapDiv.innerHTML = "<p>Nav pieejamu punktu kartes vizualizācijai.</p>";
+          mapDiv.style.display = "none";
+          return;
+        }
+
+        mapDiv.style.display = "block";
+
+        // Ja jau ir esoša karte, noņemam:
+        if (myMap) {
+          myMap.remove();
+          myMap = null;
+        }
+
+        // Izveidojam Leaflet karti
+        myMap = L.map('map').setView([0, 0], 13);
+
+        // Gaišā un tumšā karte
+        lightTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap',
+          maxZoom: 19
+        });
+
+        darkTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>, ©<a href="https://carto.com/">CARTO</a>',
+          maxZoom: 19
+        });
+
+        // Ja checkbox ir aktīvs, lietojam tumšo slāni, citādi – gaišo
+        if (darkModeCheckbox.checked) {
+          darkTileLayer.addTo(myMap);
+        } else {
+          lightTileLayer.addTo(myMap);
+        }
+
+        var layers = {
+          "ΔZ Plus virs 1.0 m - Birkas": L.layerGroup(),
+          "ΔZ Plus virs 1.0 m - Punkti": L.layerGroup(),
+          "ΔZ Plus 0.5–1.0 m - Birkas": L.layerGroup(),
+          "ΔZ Plus 0.5–1.0 m - Punkti": L.layerGroup(),
+          "ΔZ Plus 0.2–0.5 m - Birkas": L.layerGroup(),
+          "ΔZ Plus 0.2–0.5 m - Punkti": L.layerGroup(),
+          "ΔZ Plus 0.1–0.2 m - Birkas": L.layerGroup(),
+          "ΔZ Plus 0.1–0.2 m - Punkti": L.layerGroup(),
+          "ΔZ Plus līdz 0.1 m - Birkas": L.layerGroup(),
+          "ΔZ Plus līdz 0.1 m - Punkti": L.layerGroup(),
+
+          "ΔZ Mīnus līdz 0.1 m - Birkas": L.layerGroup(),
+          "ΔZ Mīnus līdz 0.1 m - Punkti": L.layerGroup(),
+          "ΔZ Mīnus 0.1–0.2 m - Birkas": L.layerGroup(),
+          "ΔZ Mīnus 0.1–0.2 m - Punkti": L.layerGroup(),
+          "ΔZ Mīnus 0.2–0.5 m - Birkas": L.layerGroup(),
+          "ΔZ Mīnus 0.2–0.5 m - Punkti": L.layerGroup(),
+          "ΔZ Mīnus 0.5–1.0 m - Birkas": L.layerGroup(),
+          "ΔZ Mīnus 0.5–1.0 m - Punkti": L.layerGroup(),
+          "ΔZ Mīnus virs 1.0 m - Birkas": L.layerGroup(),
+          "ΔZ Mīnus virs 1.0 m - Punkti": L.layerGroup(),
+
+          "Neatrasts LAS punkts": L.layerGroup()
+        };
+
+        // LAS punkti (Birkas)
+        for (i = 0; i < transformedLASPoints.length; i++){
+          var pt = transformedLASPoints[i];
+          var dz = pt.dz;
+          var layerName;
+
+          if (dz >= 0) {
+            if (dz > 1.0) {
+              layerName = "ΔZ Plus virs 1.0 m - Birkas";
+            } else if (dz > 0.5) {
+              layerName = "ΔZ Plus 0.5–1.0 m - Birkas";
+            } else if (dz > 0.2) {
+              layerName = "ΔZ Plus 0.2–0.5 m - Birkas";
+            } else if (dz > 0.1) {
+              layerName = "ΔZ Plus 0.1–0.2 m - Birkas";
+            } else {
+              layerName = "ΔZ Plus līdz 0.1 m - Birkas";
+            }
+          } else {
+            var dzAbs = Math.abs(dz);
+            if (dzAbs > 1.0) {
+              layerName = "ΔZ Mīnus virs 1.0 m - Birkas";
+            } else if (dzAbs > 0.5) {
+              layerName = "ΔZ Mīnus 0.5–1.0 m - Birkas";
+            } else if (dzAbs > 0.2) {
+              layerName = "ΔZ Mīnus 0.2–0.5 m - Birkas";
+            } else if (dzAbs > 0.1) {
+              layerName = "ΔZ Mīnus 0.1–0.2 m - Birkas";
+            } else {
+              layerName = "ΔZ Mīnus līdz 0.1 m - Birkas";
+            }
+          }
+
+          L.circleMarker([pt.lat, pt.lon], {
+            radius: 5,
+            fillColor: getColor(dz),
+            color: "#000",
+            weight: 1,
+            opacity: 1,
+            fillOpacity: 0.8
+          })
+          .bindPopup("&Delta;Z: " + (dz !== null && dz !== undefined ? dz.toFixed(3) : "") + " m (Birkas)")
+          .bindTooltip('<span style="color:' + getColor(dz) + ';">' + (dz !== null && dz !== undefined ? dz.toFixed(3) : '') + '</span>', { permanent: true, direction: 'right', className: 'dz-label' })
+          .addTo(layers[layerName]);
+        }
+
+        // CSV punkti (Punkti)
+        for (i = 0; i < transformedMatchedPoints.length; i++){
+          var pt = transformedMatchedPoints[i];
+          var dz = pt.dz;
+          var layerName;
+
+          if (dz >= 0) {
+            if (dz > 1.0) {
+              layerName = "ΔZ Plus virs 1.0 m - Punkti";
+            } else if (dz > 0.5) {
+              layerName = "ΔZ Plus 0.5–1.0 m - Punkti";
+            } else if (dz > 0.2) {
+              layerName = "ΔZ Plus 0.2–0.5 m - Punkti";
+            } else if (dz > 0.1) {
+              layerName = "ΔZ Plus 0.1–0.2 m - Punkti";
+            } else {
+              layerName = "ΔZ Plus līdz 0.1 m - Punkti";
+            }
+          } else {
+            var dzAbs = Math.abs(dz);
+            if (dzAbs > 1.0) {
+              layerName = "ΔZ Mīnus virs 1.0 m - Punkti";
+            } else if (dzAbs > 0.5) {
+              layerName = "ΔZ Mīnus 0.5–1.0 m - Punkti";
+            } else if (dzAbs > 0.2) {
+              layerName = "ΔZ Mīnus 0.2–0.5 m - Punkti";
+            } else if (dzAbs > 0.1) {
+              layerName = "ΔZ Mīnus 0.1–0.2 m - Punkti";
+            } else {
+              layerName = "ΔZ Mīnus līdz 0.1 m - Punkti";
+            }
+          }
+
+          L.circleMarker([pt.lat, pt.lon], {
+            radius: 5,
+            fillColor: getColor(dz),
+            color: "#000",
+            weight: 1,
+            opacity: 1,
+            fillOpacity: 0.8
+          })
+          .bindPopup("&Delta;Z: " + (dz !== null && dz !== undefined ? dz.toFixed(3) : "") + " m (Punkti)")
+          .bindTooltip('<span style="color:' + getColor(dz) + ';">' + (dz !== null && dz !== undefined ? dz.toFixed(3) : '') + '</span>', { permanent: false, direction: 'right', className: 'dz-label' })
+          .addTo(layers[layerName]);
+        }
+
+        for (i = 0; i < transformedUnmatchedPoints.length; i++){
+          var pt = transformedUnmatchedPoints[i];
+          L.circleMarker([pt.lat, pt.lon], {
+            radius: 5,
+            fillColor: "#ffffff",
+            color: "#000",
+            weight: 1,
+            opacity: 1,
+            fillOpacity: 0.8
+          })
+          .bindPopup("Nav atrasts LAS punkts")
+          .addTo(layers["Neatrasts LAS punkts"]);
+        }
+
+        // Noklusējumā pievienojam tikai "Punkti" un "Neatrasts" slāņus
+        for (var key in layers) {
+          if (!key.includes("Birkas")) { 
+            layers[key].addTo(myMap);
+          }
+        }
+
+        L.control.layers(null, layers, {collapsed: false, position: 'topright'}).addTo(myMap);
+
+        var group = new L.featureGroup([
+          ...layers["ΔZ Plus virs 1.0 m - Punkti"].getLayers(),
+          ...layers["ΔZ Plus 0.5–1.0 m - Punkti"].getLayers(),
+          ...layers["ΔZ Plus 0.2–1.0 m - Punkti"] || [],
+          ...layers["ΔZ Plus 0.2–0.5 m - Punkti"].getLayers(),
+          ...layers["ΔZ Plus 0.1–0.2 m - Punkti"].getLayers(),
+          ...layers["ΔZ Plus līdz 0.1 m - Punkti"].getLayers(),
+          ...layers["ΔZ Mīnus līdz 0.1 m - Punkti"].getLayers(),
+          ...layers["ΔZ Mīnus 0.1–0.2 m - Punkti"].getLayers(),
+          ...layers["ΔZ Mīnus 0.2–0.5 m - Punkti"].getLayers(),
+          ...layers["ΔZ Mīnus 0.5–1.0 m - Punkti"].getLayers(),
+          ...layers["ΔZ Mīnus virs 1.0 m - Punkti"].getLayers(),
+          ...layers["Neatrasts LAS punkts"].getLayers()
+        ]);
+        myMap.fitBounds(group.getBounds());
+
+        var legend = L.control({position: 'bottomright'});
+        legend.onAdd = function(map) {
+          var div = L.DomUtil.create('div', 'legend');
+          div.innerHTML += '<h4>&Delta;Z Leģenda</h4>';
+          div.innerHTML += '<strong>Plus vērtības:</strong><br>';
+          div.innerHTML += '<i style="background: #FF0000"></i><span>virs 1.0 m</span><br>';
+          div.innerHTML += '<i style="background: #C80032"></i><span>0.5–1.0 m</span><br>';
+          div.innerHTML += '<i style="background: #E57373"></i><span>0.2–1.0 m</span><br>';
+          div.innerHTML += '<i style="background: #FFCDD2"></i><span>0.1–0.2 m</span><br>';
+          div.innerHTML += '<i style="background: #8BC34A"></i><span>līdz 0.1 m</span><br>';
+          div.innerHTML += '<strong>Mīnus vērtības:</strong><br>';
+          div.innerHTML += '<i style="background: #8BC34A"></i><span>līdz 0.1 m</span><br>';
+          div.innerHTML += '<i style="background: #B3E5FC"></i><span>0.1–0.2 m</span><br>';
+          div.innerHTML += '<i style="background: #64B5F6"></i><span>0.2–0.5 m</span><br>';
+          div.innerHTML += '<i style="background: #1976D2"></i><span>0.5–1.0 m</span><br>';
+          div.innerHTML += '<i style="background: #0000FF"></i><span>virs 1.0 m</span><br>';
+          div.innerHTML += '<i style="background: #ffffff; border: 1px solid #000;"></i><span>Neatrasts LAS punkts</span><br>';
+          return div;
+        };
+        legend.addTo(myMap);
+      } else {
+        mapDiv.innerHTML = "<p>Nav pieejamu punktu kartes vizualizācijai.</p>";
+        mapDiv.style.display = "none";
+      }
+    }
+
+    function getColor(dz) {
+      if (dz > 1.0) {
+        return '#FF0000';
+      } else if (dz > 0.5) {
+        return '#C80032';
+      } else if (dz > 0.2) {
+        return '#E57373';
+      } else if (dz > 0.1) {
+        return '#FFCDD2';
+      } else if (dz >= 0) {
+        return '#8BC34A';
+      } else if (dz >= -0.1) {
+        return '#8BC34A';
+      } else if (dz >= -0.2) {
+        return '#B3E5FC';
+      } else if (dz >= -0.5) {
+        return '#64B5F6';
+      } else if (dz >= -1.0) {
+        return '#1976D2';
+      } else {
+        return '#0000FF';
+      }
+    }
+
+    function calculateStats(data) {
+      var n = data.length;
+      if(n ===0) return {min:0, max:0, mean:0, rmse:0};
+      var min = data[0], max = data[0], sum = 0, sumSq = 0;
+      for(var i=0; i<n; i++){
+        var val = data[i];
+        if(val < min) min = val;
+        if(val > max) max = val;
+        sum += val;
+        sumSq += val * val;
+      }
+      var mean = sum / n;
+      var rmse = Math.sqrt(sumSq / n);
+      return {min: min, max: max, mean: mean, rmse: rmse};
+    }
+
+    processBtn.addEventListener("click", function() {
+      errorDiv.textContent = "";
+      resultsDiv.innerHTML = "";
+      statusDiv.textContent = "";
+      downloadLink.style.display = "none";
+      downloadDXFLink.style.display = "none";
+      mapDiv.innerHTML = "";
+      mapDiv.style.display = "none";
+
+      // Atjauno izvēlēto koordinātu sistēmu no radio pogām
+      for (var i = 0; i < coordSystemRadios.length; i++) {
+        if (coordSystemRadios[i].checked) {
+          selectedCoordSystem = coordSystemRadios[i].value;
+          break;
+        }
+      }
+
+      if (!csvInput.files.length || !lasInput.files.length){
+        errorDiv.textContent = "Lūdzu, atlasiet gan LAS, gan CSV failu!";
+        return;
+      }
+      (async function(){
+        try {
+          var userDist = parseFloat(maxDistInput.value);
+          var maxDist = (!isNaN(userDist) && userDist > 0) ? userDist : 0.2;
+
+          statusDiv.textContent = "Nolasa CSV...";
+          csvPoints = await parseCSV(csvInput.files[0]);
+          bestDist = new Array(csvPoints.length).fill(Infinity);
+          bestLASX = new Array(csvPoints.length).fill(null);
+          bestLASY = new Array(csvPoints.length).fill(null);
+          bestLASZ = new Array(csvPoints.length).fill(null);
+
+          statusDiv.textContent = "Nolasa LAS galveni...";
+          lasFile = lasInput.files[0];
+          lasInfo = await readLASHeader(lasFile);
+
+          chunkTasks = [];
+          var pointsRemaining = lasInfo.numPoints;
+          var currentByteOffset = lasInfo.pointDataOffset;
+          while(pointsRemaining > 0){
+            var chunkPoints = Math.min(CHUNK_SIZE, pointsRemaining);
+            var byteLen = chunkPoints * lasInfo.pointRecordLen;
+            chunkTasks.push({
+              chunkPoints: chunkPoints,
+              byteStart: currentByteOffset,
+              byteLength: byteLen
+            });
+            currentByteOffset += byteLen;
+            pointsRemaining -= chunkPoints;
+          }
+          totalChunks = chunkTasks.length;
+          chunksCompleted = 0;
+          statusDiv.textContent = "Sagatavoti " + totalChunks + " chunki (distance=" + maxDist + "m, only ground=2).";
+
+          createWorkerPool(numWorkers);
+
+          for (var wIndex = 0; wIndex < workers.length; wIndex++){
+            workers[wIndex].postMessage({
+              type: 'initCSV',
+              csvPoints: csvPoints,
+              maxDistance: maxDist
+            });
+          }
+          for (var startI = 0; startI < freeWorkers.length; startI++){
+            scheduleChunk();
+          }
+
+        } catch(err){
+          console.error(err);
+          errorDiv.textContent = "Kļūda: " + err.message;
+        }
+      })();
+    });
+  </script>
+</body>
+</html>
